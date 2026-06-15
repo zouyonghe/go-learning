@@ -66,6 +66,7 @@ func (m *mpsMLP) trainWithSolver(data mnist.Dataset, epochs, batchSize int, lr f
 
 	stats := make([]mnist.EpochStat, 0, epochs)
 	indices := randPerm(len(data.Images))
+	solver := newGorgoniaSolver(optimizerName, lr)
 	for epoch := 1; epoch <= epochs; epoch++ {
 		shuffleIndices(indices)
 		var totalLoss float64
@@ -75,7 +76,7 @@ func (m *mpsMLP) trainWithSolver(data mnist.Dataset, epochs, batchSize int, lr f
 			if end > len(indices) {
 				end = len(indices)
 			}
-			loss, batchCorrect := m.trainBatchWithSolver(data, indices[start:end], lr, optimizerName)
+			loss, batchCorrect := m.trainBatchWithSolver(data, indices[start:end], solver)
 			totalLoss += float64(loss) * float64(end-start)
 			correct += batchCorrect
 		}
@@ -86,7 +87,7 @@ func (m *mpsMLP) trainWithSolver(data mnist.Dataset, epochs, batchSize int, lr f
 	return stats
 }
 
-func (m *mpsMLP) trainBatchWithSolver(data mnist.Dataset, batch []int, lr float32, optimizerName string) (float32, int) {
+func (m *mpsMLP) trainBatchWithSolver(data mnist.Dataset, batch []int, solver G.Solver) (float32, int) {
 	xBatch := make([]float32, len(batch)*m.inputSize)
 	labels := make([]int32, len(batch))
 	for row, idx := range batch {
@@ -130,7 +131,6 @@ func (m *mpsMLP) trainBatchWithSolver(data mnist.Dataset, batch []int, lr float3
 	must(G.Let(labelNode, tensor.New(tensor.WithShape(len(batch)), tensor.WithBacking(append([]int32(nil), labels...)))))
 	must(machine.RunAll())
 
-	solver := newGorgoniaSolver(optimizerName, lr)
 	must(solver.Step([]G.ValueGrad{w1, b1, w2, b2}))
 	copy(m.w1, w1.Value().(*tensor.Dense).Data().([]float32))
 	copy(m.b1, b1.Value().(*tensor.Dense).Data().([]float32))

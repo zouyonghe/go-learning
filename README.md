@@ -87,6 +87,8 @@ ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mnist trai
   -model ./mnist-mps-solver.gob
 ```
 
+`train-mps-solver` keeps the solver instance alive across batches, so Adam momentum state is preserved during training.
+
 The saved checkpoint uses the same `.gob` format as CPU training, so the regular `infer` command can load it.
 
 ## Infer
