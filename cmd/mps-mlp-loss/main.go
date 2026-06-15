@@ -24,7 +24,7 @@ func main() {
 	must(err)
 	l1Bias, err := G.BroadcastAdd(l1, b1, nil, []byte{0})
 	must(err)
-	h, err := G.MPSReLU(l1Bias)
+	h, err := G.Rectify(l1Bias)
 	must(err)
 	logits, err := G.Mul(h, w2)
 	must(err)

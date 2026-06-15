@@ -105,7 +105,7 @@ func forward(xData, w1Data, b1Data, w2Data, b2Data []float32, labelsData []int32
 	must(err)
 	preRelu, err := G.BroadcastAdd(l1, b1, nil, []byte{0})
 	must(err)
-	hidden, err := G.MPSReLU(preRelu)
+	hidden, err := G.Rectify(preRelu)
 	must(err)
 	logits, err := G.Mul(hidden, w2)
 	must(err)

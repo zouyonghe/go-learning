@@ -278,7 +278,7 @@ func (m *mpsMLP) forwardBatch(xBatch []float32, labels []int32, batchSize int) m
 	must(err)
 	preRelu, err := G.BroadcastAdd(l1, b1, nil, []byte{0})
 	must(err)
-	hidden, err := G.MPSReLU(preRelu)
+	hidden, err := G.Rectify(preRelu)
 	must(err)
 	logits, err := G.Mul(hidden, w2)
 	must(err)

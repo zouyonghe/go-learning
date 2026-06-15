@@ -70,7 +70,7 @@ func forward(xData, w1Data, b1Data, w2Data, b2Data []float32, labelsData []int32
 	must(err)
 	l1Bias, err := G.BroadcastAdd(l1, b1, nil, []byte{0})
 	must(err)
-	hidden, err := G.MPSReLU(l1Bias)
+	hidden, err := G.Rectify(l1Bias)
 	must(err)
 	logits, err := G.Mul(hidden, w2)
 	must(err)
