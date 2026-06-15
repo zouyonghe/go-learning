@@ -23,6 +23,8 @@ func main() {
 		train(os.Args[2:])
 	case "train-mps":
 		trainMPS(os.Args[2:])
+	case "train-mps-solver":
+		trainMPSSolver(os.Args[2:])
 	case "infer":
 		infer(os.Args[2:])
 	case "help", "-h", "--help":
@@ -98,11 +100,14 @@ Commands:
   train   Train a small MLP on MNIST IDX files
   train-mps
           Train a small MLP with the experimental MPSGraph path
+  train-mps-solver
+          Train with the experimental MPSGraph path and Gorgonia Grad/Solver
   infer   Run inference on a PNG/JPEG digit image
 
 Examples:
   go run ./cmd/mnist train -data ./data -epochs 5 -batch 64 -lr 0.01 -model ./mnist.gob
   ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mnist train-mps -data ./data -epochs 1 -batch 32 -limit 1000 -model ./mnist.gob
+  ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mnist train-mps-solver -data ./data -epochs 1 -batch 32 -limit 1000 -model ./mnist.gob
   go run ./cmd/mnist infer -model ./mnist.gob -image ./digit.png`)
 }
 

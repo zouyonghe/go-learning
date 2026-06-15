@@ -73,6 +73,20 @@ ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mnist trai
   -model ./mnist-mps.gob
 ```
 
+To exercise the more standard Gorgonia training path, use `train-mps-solver`. It builds the same MPSGraph-backed forward graph, calls `Grad(loss, w1, b1, w2, b2)`, and updates parameters with a Gorgonia solver:
+
+```bash
+ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mnist train-mps-solver \
+  -data ./data \
+  -epochs 10 \
+  -batch 32 \
+  -limit 1000 \
+  -hidden 128 \
+  -lr 0.001 \
+  -optimizer adam \
+  -model ./mnist-mps-solver.gob
+```
+
 The saved checkpoint uses the same `.gob` format as CPU training, so the regular `infer` command can load it.
 
 ## Infer
