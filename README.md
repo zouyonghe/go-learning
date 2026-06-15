@@ -178,6 +178,18 @@ Expected output:
 before=23.000000 after=19.541649
 ```
 
+Run one standard Gorgonia optimizer step using `Grad(loss, w1, b1, w2, b2)` and `AdamSolver`:
+
+```bash
+ASSUME_NO_MOVING_GC_UNSAFE_RISK_IT_WITH=go1.26 go run -tags mps ./cmd/mps-solver-step
+```
+
+Expected output:
+
+```text
+before=23.000000 after=22.433197
+```
+
 ## Notes
 
 - This is a learning-oriented implementation, not a production training framework.
