@@ -31,9 +31,7 @@ func main() {
 	b2Data := []float32{0.25, -0.75}
 	labels := []int32{1, 0}
 
-	before, preRelu, hidden, logits := forward(xData, w1Data, b1Data, w2Data, b2Data, labels)
-	dLogits, err := G.MPSCrossEntropyLogitsGradFloat32(logits, labels, 2, 2)
-	must(err)
+	before, preRelu, hidden, dLogits := forward(xData, w1Data, b1Data, w2Data, b2Data, labels)
 
 	dHidden := make([]float32, 2*4)
 	for row := 0; row < 2; row++ {
@@ -131,7 +129,26 @@ func forward(xData, w1Data, b1Data, w2Data, b2Data []float32, labelsData []int32
 	return lossValue,
 		append([]float32(nil), preReluValue...),
 		append([]float32(nil), hiddenValue...),
-		append([]float32(nil), logitsValue...)
+		crossEntropyLogitsGrad(logitsValue, labelsData, 2, 2)
+}
+
+func crossEntropyLogitsGrad(logitsData []float32, labelsData []int32, rows, classes int) []float32 {
+	g := G.NewGraph()
+	logits := G.NewMatrix(g, tensor.Float32, G.WithShape(rows, classes), G.WithName("logits"))
+	labels := G.NewVector(g, tensor.Int32, G.WithShape(rows), G.WithName("labels"))
+	loss, err := G.MPSCrossEntropy(logits, labels)
+	must(err)
+	if _, err := G.Grad(loss, logits); err != nil {
+		must(err)
+	}
+	m := G.NewTapeMachine(g, G.BindDualValues(logits))
+	defer m.Close()
+	must(G.Let(logits, tensor.New(tensor.WithShape(rows, classes), tensor.WithBacking(append([]float32(nil), logitsData...)))))
+	must(G.Let(labels, tensor.New(tensor.WithShape(rows), tensor.WithBacking(append([]int32(nil), labelsData...)))))
+	must(m.RunAll())
+	grad, err := logits.Grad()
+	must(err)
+	return append([]float32(nil), grad.(*tensor.Dense).Data().([]float32)...)
 }
 
 func must(err error) {

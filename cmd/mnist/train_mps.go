@@ -35,6 +35,7 @@ type mpsBatchResult struct {
 	preRelu []float32
 	hidden  []float32
 	logits  []float32
+	dLogits []float32
 }
 
 func trainMPS(args []string) {
@@ -138,8 +139,6 @@ func (m *mpsMLP) trainBatch(data mnist.Dataset, batch []int, optimizer *mpsOptim
 	}
 
 	result := m.forwardBatch(xBatch, labels, len(batch))
-	dLogits, err := G.MPSCrossEntropyLogitsGradFloat32(result.logits, labels, len(batch), m.classes)
-	must(err)
 	dW1 := make([]float32, len(m.w1))
 	dB1 := make([]float32, len(m.b1))
 	dW2 := make([]float32, len(m.w2))
@@ -150,7 +149,7 @@ func (m *mpsMLP) trainBatch(data mnist.Dataset, batch []int, optimizer *mpsOptim
 		for hiddenCol := 0; hiddenCol < m.hiddenSize; hiddenCol++ {
 			var grad float32
 			for classCol := 0; classCol < m.classes; classCol++ {
-				grad += dLogits[row*m.classes+classCol] * m.w2[hiddenCol*m.classes+classCol]
+				grad += result.dLogits[row*m.classes+classCol] * m.w2[hiddenCol*m.classes+classCol]
 			}
 			dHidden[row*m.hiddenSize+hiddenCol] = grad
 		}
@@ -167,7 +166,7 @@ func (m *mpsMLP) trainBatch(data mnist.Dataset, batch []int, optimizer *mpsOptim
 		for classCol := 0; classCol < m.classes; classCol++ {
 			var grad float32
 			for row := 0; row < len(batch); row++ {
-				grad += result.hidden[row*m.hiddenSize+hiddenCol] * dLogits[row*m.classes+classCol]
+				grad += result.hidden[row*m.hiddenSize+hiddenCol] * result.dLogits[row*m.classes+classCol]
 			}
 			dW2[hiddenCol*m.classes+classCol] = grad
 		}
@@ -175,7 +174,7 @@ func (m *mpsMLP) trainBatch(data mnist.Dataset, batch []int, optimizer *mpsOptim
 	for classCol := 0; classCol < m.classes; classCol++ {
 		var grad float32
 		for row := 0; row < len(batch); row++ {
-			grad += dLogits[row*m.classes+classCol]
+			grad += result.dLogits[row*m.classes+classCol]
 		}
 		dB2[classCol] = grad
 	}
@@ -297,12 +296,33 @@ func (m *mpsMLP) forwardBatch(xBatch []float32, labels []int32, batchSize int) m
 	must(G.Let(labelNode, tensor.New(tensor.WithShape(batchSize), tensor.WithBacking(append([]int32(nil), labels...)))))
 	must(machine.RunAll())
 
+	logitsData := append([]float32(nil), logitsBias.Value().(*tensor.Dense).Data().([]float32)...)
 	return mpsBatchResult{
 		loss:    loss.Value().(*G.F32).Data().(float32),
 		preRelu: append([]float32(nil), preRelu.Value().(*tensor.Dense).Data().([]float32)...),
 		hidden:  append([]float32(nil), hidden.Value().(*tensor.Dense).Data().([]float32)...),
-		logits:  append([]float32(nil), logitsBias.Value().(*tensor.Dense).Data().([]float32)...),
+		logits:  logitsData,
+		dLogits: crossEntropyLogitsGrad(logitsData, labels, batchSize, m.classes),
 	}
+}
+
+func crossEntropyLogitsGrad(logitsData []float32, labelsData []int32, rows, classes int) []float32 {
+	g := G.NewGraph()
+	logits := G.NewMatrix(g, tensor.Float32, G.WithShape(rows, classes), G.WithName("logits"))
+	labels := G.NewVector(g, tensor.Int32, G.WithShape(rows), G.WithName("labels"))
+	loss, err := G.MPSCrossEntropy(logits, labels)
+	must(err)
+	if _, err := G.Grad(loss, logits); err != nil {
+		must(err)
+	}
+	machine := G.NewTapeMachine(g, G.BindDualValues(logits))
+	defer machine.Close()
+	must(G.Let(logits, tensor.New(tensor.WithShape(rows, classes), tensor.WithBacking(append([]float32(nil), logitsData...)))))
+	must(G.Let(labels, tensor.New(tensor.WithShape(rows), tensor.WithBacking(append([]int32(nil), labelsData...)))))
+	must(machine.RunAll())
+	grad, err := logits.Grad()
+	must(err)
+	return append([]float32(nil), grad.(*tensor.Dense).Data().([]float32)...)
 }
 
 func (m *mpsMLP) toMLP() *mnist.MLP {
